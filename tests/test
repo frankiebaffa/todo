@@ -1,0 +1,66 @@
+#!/bin/bash
+pass_count=0;
+fail_count=0;
+fail_arr=();
+function check_int_pass {
+	passing_res="$1";
+	receive_res="$2";
+	test_name="$3";
+	if [ $1 -ne $2 ]
+	then
+		fail_count=$((fail_count+1));
+		fail_arr+=("$3:Expected \"$1\" and received \"$2\"");
+	else
+		pass_count=$((pass_count+1));
+	fi
+}
+script_dir=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd);
+tmp_path="./test_list";
+# File should not exist
+$script_dir/.././todo -qsl create;
+check_int_pass 7 $? "File does not exist";
+# File created successfully
+$script_dir/.././todo -qnl "$tmp_path";
+check_int_pass 0 $? "File created successfully";
+# File creation failed
+$script_dir/.././todo -qnl "$tmp_path";
+check_int_pass 6 $? "File creation failed";
+# Add todo
+$script_dir/.././todo -qal "$tmp_path" -m "First item";
+check_int_pass 0 $? "Add todo";
+# Check todo
+$script_dir/.././todo -qcl "$tmp_path" -i 1;
+check_int_pass 0 $? "Check todo";
+# Uncheck todo
+$script_dir/.././todo -qul "$tmp_path" -i 1;
+check_int_pass 0 $? "Uncheck todo";
+# Show list
+$script_dir/.././todo -qsl "$tmp_path";
+check_int_pass 0 $? "Show list";
+# Missing list-item message
+$script_dir/.././todo -qal "$tmp_path";
+check_int_pass 4 $? "Missing list-item message";
+# Missing list-item number
+$script_dir/.././todo -qcl "$tmp_path";
+check_int_pass 5 $? "Missing list-item number";
+rm "$tmp_path.md";
+# Option underflow
+$script_dir/.././todo -qnl;
+check_int_pass 2 $? "Option underflow";
+# Missing list name
+$script_dir/.././todo -qam "First item";
+check_int_pass 3 $? "Missing list name";
+# Display results
+echo "Passed: $pass_count";
+echo "Failed: $fail_count";
+if [ $fail_count -gt 0 ]
+then
+	for res in "${fail_arr[@]}"
+	do
+		IFS=':' read -ra failure <<< "$res";
+		tst="${failure[0]}";
+		msg="${failure[1]}";
+		echo "***Failed: $tst***";
+		echo "$msg";
+	done
+fi

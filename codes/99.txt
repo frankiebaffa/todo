@@ -1,0 +1,3 @@
+99
+bad_item
+There is a duplicate flag, option, or code

@@ -1,0 +1,333 @@
+#!/bin/bash
+script_dir=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd);
+# context parsing
+flags_str="$(./file_ctx/./file_ctx --parse --flags)";
+flags=(${flags_str[@]});
+options_str="$(./file_ctx/./file_ctx --parse --options)";
+options=(${options_str[@]});
+codes_str="$(./file_ctx/./file_ctx --parse --codes)";
+codes=(${codes_str[@]});
+function get_list_path {
+	echo "$1.md";
+}
+function get_list_content {
+	echo "$(cat "$1")";
+}
+function get_next {
+	echo $(echo "$1" | grep "$2\.\s\[\(\s\|x\)\]");
+}
+function get_next_item_number {
+	iter=1;
+	while [[ ! -z "$(get_next "$1" "$iter")" ]]
+	do
+		iter=$((iter+1));
+	done
+	echo "$iter";
+}
+function check_item {
+	echo "$(echo "$1" | sed "s/^$2. \[ \]/$2. \[x\]/")"
+}
+function uncheck_item {
+	echo "$(echo "$1" | sed "s/^$2. \[x\]/$2. \[ \]/")"
+}
+function update_last_edit {
+	sed_string="s/^Last Edit :.\+$/Last Edit : $(date '+%Y-%m-%dT%H:%M:%S%Z')/";
+	content="$(echo "$(echo "$1" | sed "$sed_string")")";
+	echo "$content";
+}
+function get_help {
+	echo "$(cat "$script_dir/help.md")";
+}
+cur_dir="$PWD";
+# flags
+add=0;
+check=0;
+new=0;
+show=0;
+quiet=0;
+test=0;
+uncheck=0;
+verbose=0;
+help=0;
+function q_print {
+	if [ $quiet -eq 0 ] && [[ ! -z "$1" ]]
+	then
+		echo "$1";
+	fi
+}
+function v_print {
+	if [ $verbose -eq 1 ] && [[ ! -z "$1" ]]
+	then
+		q_print "$1";
+	fi
+}
+function print_list {
+	v_print "==FILE==";
+	q_print "$(cat "$1")";
+	v_print "==/FILE==";
+}
+# options
+item="";
+list="";
+message="";
+# loop-check variables
+matched_flag="";
+matched_option="";
+# check if args are empty
+if [ ${#@} -eq 0 ]
+then
+	get_help;
+	exit 0;
+fi
+# split arg list
+parsed_args=();
+for arg in "$@"
+do
+	if [[ "${arg:0:2}" == "--" ]]
+	then
+		parsed_args+=("${arg:2:${#arg}}");
+	elif [[ "${arg:0:1}" == "-" ]]
+	then
+		sub_arr="${arg:1:${#arg}}"
+		for i in $(seq 1 ${#sub_arr})
+		do
+			sub_arg="${sub_arr:i-1:1}";
+			parsed_args+=("$sub_arg");
+		done
+	else
+		parsed_args+=("$arg");
+	fi
+done
+# match arguments with flags and options
+for arg in "${parsed_args[@]}"
+do
+	if [[ ! -z "$matched_option" ]]
+	then
+		if [[ "$matched_option" == "i" ]] || [[ "$matched_option" == "item" ]]
+		then
+			item=$arg;
+		elif [[ "$matched_option" == "l" ]] || [[ "$matched_option" == "list" ]]
+		then
+			list=$arg;
+		elif [[ "$matched_option" == "m" ]] || [[ "$matched_option" == "message" ]]
+		then
+			message=$arg;
+		fi
+		matched_option="";
+		continue;
+	fi
+	for flag in "${flags[@]}"
+	do
+		IFS=':' read -ra params <<< "$flag";
+		if [[ "$arg" == "${params[0]}" ]] || [[ "$arg" == "${params[1]}" ]]
+		then
+			matched_flag="$arg";
+			break;
+		fi
+	done
+	if [[ ! -z "$matched_flag" ]]
+	then
+		if [[ "$matched_flag" == "a" ]] || [[ "$matched_flag" == "add" ]]
+		then
+			add=1;
+		elif [[ "$matched_flag" == "c" ]] || [[ "$matched_flag" == "check" ]]
+		then
+			check=1;
+		elif [[ "$matched_flag" == "h" ]] || [[ "$matched_flag" == "help" ]]
+		then
+			help=1;
+		elif [[ "$matched_flag" == "n" ]] || [[ "$matched_flag" == "new" ]]
+		then
+			new=1;
+		elif [[ "$matched_flag" == "q" ]] || [[ "$matched_flag" == "quiet" ]]
+		then
+			quiet=1;
+		elif [[ "$matched_flag" == "t" ]] || [[ "$matched_flag" == "test" ]]
+		then
+			test=1;
+		elif [[ "$matched_flag" == "s" ]] || [[ "$matched_flag" == "show" ]]
+		then
+			show=1;
+		elif [[ "$matched_flag" == "u" ]] || [[ "$matched_flag" == "uncheck" ]]
+		then
+			uncheck=1;
+		elif [[ "$matched_flag" == "v" ]] || [[ "$matched_flag" == "verbose" ]]
+		then
+			verbose=1;
+		fi
+		matched_flag="";
+		continue;
+	fi
+	for option in "${options[@]}"
+	do
+		IFS=':' read -ra params <<< "$option";
+		if [[ "$arg" == "${params[0]}" ]] || [[ "$arg" == "${params[1]}" ]]
+		then
+			matched_option="$arg";
+			break;
+		fi
+	done
+	if [[ ! -z "$matched_option" ]]
+	then
+		continue;
+	fi
+done
+if [[ ! -z "$matched_option" ]]
+then
+	q_print "Option \"$matched_option\" requires a value";
+	exit 2;
+elif [ $help -eq 1 ]
+then
+	get_help;
+	exit 0;
+elif [ $test -eq 1 ]
+then
+	v_print "Running tests";
+	$script_dir/tests/./test;
+	exit 0;
+fi
+# prints
+v_print "==FLAGS=="
+v_print "Add    : $add";
+v_print "Check  : $check";
+v_print "New    : $new";
+v_print "Quiet  : $quiet";
+v_print "Show   : $show";
+v_print "Verbose: $verbose";
+v_print "Uncheck: $uncheck";
+v_print "==/FLAGS==";
+v_print "==OPTIONS==";
+v_print "Item   : $item";
+v_print "List   : $list";
+v_print "Message: $message";
+v_print "==/OPTIONS==";
+v_print "==RUN==";
+path="";
+# create new list
+if [ $new -eq 1 ] && [[ ! -z "$list" ]]
+then
+	v_print "Creating new list \"$list\"";
+	path="$(get_list_path "$list")";
+	if [[ -z "$path" ]]
+	then
+		q_print "Path failed to derive from --list value \"$list\"";
+		exit 8;
+	elif [[ -f "$path" ]]
+	then
+		q_print "File \"$path\" already exists";
+		exit 6;
+	fi
+	content="$(echo "$(cat "$script_dir/docs/new.md")")";
+	content="$(echo "$(echo "$content" | sed "s/\[\[C_DATE\]\]/$(date '+%Y-%m-%dT%H:%M:%S%Z')/")")";
+	content="$(echo "$(echo "$content" | sed "s/\[\[E_DATE\]\]/$(date '+%Y-%m-%dT%H:%M:%S%Z')/")")";
+	echo "$content" > "$path";
+	echo "" >> "$path";
+	v_print "Created new list \"$path\"";
+# fail new list due to missing list name
+elif [ $new -eq 1 ] && [[ -z "$list" ]]
+then
+	q_print "Missing name for list";
+	exit 3;
+fi
+# add new item
+if [ $add -eq 1 ] && [[ ! -z "$list" ]] && [[ ! -z "$message" ]]
+then
+	v_print "Creating new list-item in list \"$list\" with message \"$message\"";
+	path="$(get_list_path "$list")";
+	if [[ -z "$path" ]]
+	then
+		q_print "Path failed to derive from --list value \"$list\"";
+		exit 8;
+	elif [[ ! -f "$path" ]]
+	then
+		q_print "File \"$path\" does not exist";
+		exit 7;
+	fi
+	content="$(get_list_content "$path")";
+	next="$(get_next_item_number "$content")";
+	echo "$next. [ ] $message" >> "$path";
+	content="$(get_list_content "$path")";
+	content=$(update_last_edit "$content");
+	echo "$content" > "$path";
+	v_print "New list-item \"$message\" created in list \"$list\"";
+# fail new item due to missing list name
+elif [ $add -eq 1 ] && [[ -z "$list" ]]
+then
+	q_print "Missing name for list";
+	exit 3;
+# fail new item due to missing list-item message
+elif [ $add -eq 1 ] && [[ -z "$message" ]]
+then
+	q_print "Missing message for list-item";
+	exit 4;
+fi
+# check list item
+if [ $check -eq 1 ] && [[ ! -z "$item" ]]
+then
+	v_print "Checking item \"$item\" from list \"$list\"";
+	path="$(get_list_path "$list")";
+	if [[ -z "$path" ]]
+	then
+		q_print "Path failed to derive from --list value \"$list\"";
+		exit 8;
+	elif [[ ! -f "$path" ]]
+	then
+		q_print "File \"$path\" does not exist";
+		exit 7;
+	fi
+	content="$(get_list_content "$path")";
+	content="$(check_item "$content" "$item")";
+	content=$(update_last_edit "$content");
+	q_print "$content" > "$path";
+	v_print "Checked item \"$item\" from list \"$list\"";
+elif [ $check -eq 1 ] && [[ -z "$item" ]]
+then
+	q_print "Missing option --item";
+	exit 5;
+fi
+# uncheck list item
+if [ $uncheck -eq 1 ] && [[ ! -z "$item" ]]
+then
+	v_print "Unchecking item $item from list \"$list\"";
+	v_print "Checking item \"$item\" from list \"$list\"";
+	path="$(get_list_path "$list")";
+	if [[ -z "$path" ]]
+	then
+		q_print "Path failed to derive from --list value \"$list\"";
+		exit 8;
+	elif [[ ! -f "$path" ]]
+	then
+		q_print "File \"$path\" does not exist";
+		exit 7;
+	fi
+	content="$(get_list_content "$path")";
+	content="$(uncheck_item "$content" "$item")";
+	content=$(update_last_edit "$content");
+	echo "$content" > "$path";
+	v_print "Checked item \"$item\" from list \"$list\"";
+elif [ $uncheck -eq 1 ] && [[ -z "$item" ]]
+then
+	q_print "Missing option --item";
+	exit 5;
+fi
+if [ $show -eq 1 ] && [[ ! -z "$list" ]]
+then
+	v_print "Displaying list \"$list\"";
+	path="$(get_list_path "$list")";
+	if [[ -z "$path" ]]
+	then
+		q_print "Path failed to derive from --list value \"$list\"";
+		exit 8;
+	elif [[ ! -f "$path" ]]
+	then
+		q_print "File \"$path\" does not exist";
+		exit 7;
+	fi
+	print_list "$path";
+	v_print "List \"$list\" displayed";
+elif [ $show -eq 1 ] && [[ -z "$list" ]]
+then
+	q_print "Missing option --list";
+	exit 3;
+fi
+v_print "==/RUN==";

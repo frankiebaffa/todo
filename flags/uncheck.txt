@@ -1,0 +1,3 @@
+u
+uncheck
+Unchecks a list-item by item-number

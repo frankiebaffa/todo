@@ -1,0 +1,3 @@
+t
+test
+Runs all tests (overrides all other flags/options)
