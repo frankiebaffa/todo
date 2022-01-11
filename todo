@@ -1,11 +1,11 @@
 #!/bin/bash
 script_dir=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd);
 # context parsing
-flags_str="$(./file_ctx/./file_ctx --parse --flags)";
+flags_str="$(./file_ctx/./file_ctx --parse --flags "$script_dir")";
 flags=(${flags_str[@]});
-options_str="$(./file_ctx/./file_ctx --parse --options)";
+options_str="$(./file_ctx/./file_ctx --parse --options "$script_dir")";
 options=(${options_str[@]});
-codes_str="$(./file_ctx/./file_ctx --parse --codes)";
+codes_str="$(./file_ctx/./file_ctx --parse --codes "$script_dir")";
 codes=(${codes_str[@]});
 function get_list_path {
 	echo "$1.md";
